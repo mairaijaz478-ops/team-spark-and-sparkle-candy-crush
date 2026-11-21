@@ -109,8 +109,56 @@ void drawGame(sf::RenderWindow& window)
 
 void findMatches(bool matches[ROWS][COLS])
 {
-    (void)matches;
-    // TODO: Mark every candy in a horizontal or vertical match of 3 or more.
+  
+    
+    
+        // Step 1: Start fresh - nothing is matched yet
+        for (int row = 0; row < ROWS; row++)
+        {
+            for (int col = 0; col < COLS; col++)
+            {
+                matches[row][col] = false;
+            }
+        }
+
+        // Step 2: Look for 3 in a row HORIZONTALLY
+        // (col only goes up to COLS - 3 so col + 2 never goes off the board)
+        for (int row = 0; row < ROWS; row++)
+        {
+            for (int col = 0; col <= COLS - 3; col++)
+            {
+                int candy = board[row][col];
+
+                if (candy != 0 &&
+                    candy == board[row][col + 1] &&
+                    candy == board[row][col + 2])
+                {
+                    matches[row][col] = true;
+                    matches[row][col + 1] = true;
+                    matches[row][col + 2] = true;
+                }
+            }
+        }
+
+        // Step 3: Look for 3 in a column VERTICALLY
+        // (row only goes up to ROWS - 3 so row + 2 never goes off the board)
+        for (int col = 0; col < COLS; col++)
+        {
+            for (int row = 0; row <= ROWS - 3; row++)
+            {
+                int candy = board[row][col];
+
+                if (candy != 0 &&
+                    candy == board[row + 1][col] &&
+                    candy == board[row + 2][col])
+                {
+                    matches[row][col] = true;
+                    matches[row + 1][col] = true;
+                    matches[row + 2][col] = true;
+                }
+            }
+        }
+    
 }
 
 void clearMatches(const bool matches[ROWS][COLS])
