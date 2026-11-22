@@ -43,7 +43,7 @@ int main()
 {
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-    sf::RenderWindow window(sf::VideoMode({600, 680}), "Candy Crush");
+    sf::RenderWindow window(sf::VideoMode({ 600, 680 }), "Candy Crush");
     window.setFramerateLimit(60);
 
     while (window.isOpen())
@@ -85,9 +85,30 @@ int main()
 
 bool loadLevel(const char* fileName)
 {
-    (void)fileName;
-    return false;
+    std::ifstream file(level.txt);
+    if (!file)
+    {
+        return false;
+    }
+    file >> movesLeft;
+    file >> targetScore;
+    selectedrow = -1;
+    selectedcol = -1;
+    score = 0;
+    for (int r = 0; r < ROWS; r++)
+    {
+        for (int c = 0; c < COLS; c++)
+        {
+            file >> board[r][c];
+            marked[r][c] = false;
+        }
+    }
+    file.close();
+    return true;
+
 }
+
+
 
 void handleInput(sf::RenderWindow& window)
 {
@@ -109,73 +130,73 @@ void drawGame(sf::RenderWindow& window)
 
 void findMatches(bool matches[ROWS][COLS])
 {
-  
-    
-    
-        // Step 1: Start fresh - nothing is matched yet
-        for (int row = 0; row < ROWS; row++)
-        {
-            for (int col = 0; col < COLS; col++)
-            {
-                matches[row][col] = false;
-            }
-        }
 
-        // Step 2: Look for 3 in a row HORIZONTALLY
-        // (col only goes up to COLS - 3 so col + 2 never goes off the board)
-        for (int row = 0; row < ROWS; row++)
-        {
-            for (int col = 0; col <= COLS - 3; col++)
-            {
-                int candy = board[row][col];
 
-                if (candy != 0 &&
-                    candy == board[row][col + 1] &&
-                    candy == board[row][col + 2])
-                {
-                    matches[row][col] = true;
-                    matches[row][col + 1] = true;
-                    matches[row][col + 2] = true;
-                }
-            }
-        }
 
-        // Step 3: Look for 3 in a column VERTICALLY
-        // (row only goes up to ROWS - 3 so row + 2 never goes off the board)
+    // Step 1: Start fresh - nothing is matched yet
+    for (int row = 0; row < ROWS; row++)
+    {
         for (int col = 0; col < COLS; col++)
         {
-            for (int row = 0; row <= ROWS - 3; row++)
-            {
-                int candy = board[row][col];
+            matches[row][col] = false;
+        }
+    }
 
-                if (candy != 0 &&
-                    candy == board[row + 1][col] &&
-                    candy == board[row + 2][col])
-                {
-                    matches[row][col] = true;
-                    matches[row + 1][col] = true;
-                    matches[row + 2][col] = true;
-                }
+    // Step 2: Look for 3 in a row HORIZONTALLY
+    // (col only goes up to COLS - 3 so col + 2 never goes off the board)
+    for (int row = 0; row < ROWS; row++)
+    {
+        for (int col = 0; col <= COLS - 3; col++)
+        {
+            int candy = board[row][col];
+
+            if (candy != 0 &&
+                candy == board[row][col + 1] &&
+                candy == board[row][col + 2])
+            {
+                matches[row][col] = true;
+                matches[row][col + 1] = true;
+                matches[row][col + 2] = true;
             }
         }
-    
+    }
+
+    // Step 3: Look for 3 in a column VERTICALLY
+    // (row only goes up to ROWS - 3 so row + 2 never goes off the board)
+    for (int col = 0; col < COLS; col++)
+    {
+        for (int row = 0; row <= ROWS - 3; row++)
+        {
+            int candy = board[row][col];
+
+            if (candy != 0 &&
+                candy == board[row + 1][col] &&
+                candy == board[row + 2][col])
+            {
+                matches[row][col] = true;
+                matches[row + 1][col] = true;
+                matches[row + 2][col] = true;
+            }
+        }
+    }
+
 }
 
 void clearMatches(const bool matches[ROWS][COLS])
 {
-        // Go through every cell on the board
-        for (int row = 0; row < ROWS; row++)
+    // Go through every cell on the board
+    for (int row = 0; row < ROWS; row++)
+    {
+        for (int col = 0; col < COLS; col++)
         {
-            for (int col = 0; col < COLS; col++)
+            // If findMatches marked this cell, remove the candy
+            if (matches[row][col] == true)
             {
-                // If findMatches marked this cell, remove the candy
-                if (matches[row][col] == true)
-                {
-                    board[row][col] = 0;           // 0 means the cell is now empty
-                    score = score + POINTS_PER_CANDY;  // 10 points for each candy cleared
-                }
+                board[row][col] = 0;           // 0 means the cell is now empty
+                score = score + POINTS_PER_CANDY;  // 10 points for each candy cleared
             }
         }
+    }
 }
 
 void dropCandies()
