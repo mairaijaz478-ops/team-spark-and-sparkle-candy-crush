@@ -163,8 +163,19 @@ void findMatches(bool matches[ROWS][COLS])
 
 void clearMatches(const bool matches[ROWS][COLS])
 {
-    (void)matches;
-    // TODO: Clear marked candies and add points.
+        // Go through every cell on the board
+        for (int row = 0; row < ROWS; row++)
+        {
+            for (int col = 0; col < COLS; col++)
+            {
+                // If findMatches marked this cell, remove the candy
+                if (matches[row][col] == true)
+                {
+                    board[row][col] = 0;           // 0 means the cell is now empty
+                    score = score + POINTS_PER_CANDY;  // 10 points for each candy cleared
+                }
+            }
+        }
 }
 
 void dropCandies()
