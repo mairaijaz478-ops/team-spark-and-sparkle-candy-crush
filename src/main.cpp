@@ -180,7 +180,30 @@ void clearMatches(const bool matches[ROWS][COLS])
 
 void dropCandies()
 {
-    // TODO: Move candies down within each column.
+    
+    
+        // Handle each column on its own
+        for (int col = 0; col < COLS; col++)
+        {
+            // emptySpot is where the next candy will land.
+            // We start at the bottom row of the column.
+            int emptySpot = ROWS - 1;
+
+            // Look at the column from the bottom up to the top
+            for (int row = ROWS - 1; row >= 0; row--)
+            {
+                // If this cell has a candy, move it down to the lowest free spot
+                if (board[row][col] != 0)
+                {
+                    int candy = board[row][col];
+
+                    board[row][col] = 0;           // empty the old spot
+                    board[emptySpot][col] = candy; // put the candy in its new spot
+
+                    emptySpot--;                   // the next candy lands one spot higher
+                }
+            }
+        }
 }
 
 void refillBoard()
