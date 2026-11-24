@@ -2,6 +2,9 @@
 #include <optional>
 #include <cstdlib>
 #include <ctime>
+#include <iostream>
+#include <fstream>   // <-- THIS LINE IS MISSING
+using namespace std;
 
 const int ROWS = 8;
 const int COLS = 8;
@@ -16,8 +19,8 @@ bool marked[ROWS][COLS] = {};
 int score = 0;
 int movesLeft = 0;
 int targetScore = 0;
-int selectedRow = -1;
-int selectedCol = -1;
+int selectedrow = -1;
+int selectedcol = -1;
 int gameState = 0;
 int clickX = -1;
 int clickY = -1;
@@ -85,26 +88,30 @@ int main()
 
 bool loadLevel(const char* fileName)
 {
-    std::ifstream file(level.txt);
-    if (!file)
-    {
-        return false;
-    }
-    file >> movesLeft;
-    file >> targetScore;
-    selectedrow = -1;
-    selectedcol = -1;
-    score = 0;
-    for (int r = 0; r < ROWS; r++)
-    {
-        for (int c = 0; c < COLS; c++)
+        std::ifstream file(fileName);
+        if (!file)
         {
-            file >> board[r][c];
-            marked[r][c] = false;
+            return false;
         }
-    }
-    file.close();
-    return true;
+
+        file >> movesLeft;
+        file >> targetScore;
+        selectedrow = -1;
+        selectedcol = -1;
+        score = 0;
+
+        for (int r = 0; r < ROWS; r++)
+        {
+            for (int c = 0; c < COLS; c++)
+            {
+                file >> board[r][c];
+                marked[r][c] = false;
+            }
+        }
+
+        file.close();
+        return true;
+    
 
 }
 
@@ -130,70 +137,62 @@ void drawGame(sf::RenderWindow& window)
 
 void findMatches(bool matches[ROWS][COLS])
 {
-
-
-
-    // Step 1: Start fresh - nothing is matched yet
-    for (int row = 0; row < ROWS; row++)
+    // First make all false, no match in start
+    for (int r = 0; r < ROWS; r++)
     {
-        for (int col = 0; col < COLS; col++)
+        for (int c = 0; c < COLS; c++)
         {
-            matches[row][col] = false;
+            matches[r][c] = false;
         }
     }
 
-    // Step 2: Look for 3 in a row HORIZONTALLY
-    // (col only goes up to COLS - 3 so col + 2 never goes off the board)
-    for (int row = 0; row < ROWS; row++)
+    // Check side by side - 3 same in a row
+    for (int r = 0; r < ROWS; r++)
     {
-        for (int col = 0; col <= COLS - 3; col++)
+        for (int c = 0; c <= COLS - 3; c++)
         {
-            int candy = board[row][col];
-
-            if (candy != 0 &&
-                candy == board[row][col + 1] &&
-                candy == board[row][col + 2])
+            // If not empty and all 3 are same
+            if (board[r][c] != 0 &&
+                board[r][c] == board[r][c + 1] &&
+                board[r][c] == board[r][c + 2])
             {
-                matches[row][col] = true;
-                matches[row][col + 1] = true;
-                matches[row][col + 2] = true;
+                matches[r][c] = true;
+                matches[r][c + 1] = true;
+                matches[r][c + 2] = true;
             }
         }
     }
 
-    // Step 3: Look for 3 in a column VERTICALLY
-    // (row only goes up to ROWS - 3 so row + 2 never goes off the board)
-    for (int col = 0; col < COLS; col++)
+    // Check up to down - 3 same in a column
+    for (int c = 0; c < COLS; c++)
     {
-        for (int row = 0; row <= ROWS - 3; row++)
+        for (int r = 0; r <= ROWS - 3; r++)
         {
-            int candy = board[row][col];
-
-            if (candy != 0 &&
-                candy == board[row + 1][col] &&
-                candy == board[row + 2][col])
+            // If not empty and all 3 are same
+            if (board[r][c] != 0 &&
+                board[r][c] == board[r + 1][c] &&
+                board[r][c] == board[r + 2][c])
             {
-                matches[row][col] = true;
-                matches[row + 1][col] = true;
-                matches[row + 2][col] = true;
+                matches[r][c] = true;
+                matches[r + 1][c] = true;
+                matches[r + 2][c] = true;
             }
         }
     }
-
 }
 
 void clearMatches(const bool matches[ROWS][COLS])
 {
-    // Go through every cell on the board
-    for (int row = 0; row < ROWS; row++)
+    // Go through whole board
+    for (int r = 0; r < ROWS; r++)
     {
-        for (int col = 0; col < COLS; col++)
+        for (int c = 0; c < COLS; c++)
         {
-            // If findMatches marked this cell, remove the candy
-            if (matches[row][col] == true)
+            // If this cell was matched
+            if (matches[r][c] == true)
             {
-                board[row][col] = 0;           // 0 means the cell is now empty
-                score = score + POINTS_PER_CANDY;  // 10 points for each candy cleared
+                board[r][c] = 0; // make it empty
+                score = score + 10; // 10 points for 1 candy
             }
         }
     }
@@ -201,35 +200,39 @@ void clearMatches(const bool matches[ROWS][COLS])
 
 void dropCandies()
 {
-    
-    
-        // Handle each column on its own
-        for (int col = 0; col < COLS; col++)
+    // Check every column
+    for (int col = 0; col < COLS; col++)
+    {
+        // We do this many times so candies fall all the way down
+        for (int times = 0; times < ROWS; times++)
         {
-            // emptySpot is where the next candy will land.
-            // We start at the bottom row of the column.
-            int emptySpot = ROWS - 1;
-
-            // Look at the column from the bottom up to the top
-            for (int row = ROWS - 1; row >= 0; row--)
+            // Check from bottom to top
+            for (int row = ROWS - 1; row > 0; row--)
             {
-                // If this cell has a candy, move it down to the lowest free spot
-                if (board[row][col] != 0)
+                // If this cell is empty, pull the candy from above down
+                if (board[row][col] == 0)
                 {
-                    int candy = board[row][col];
-
-                    board[row][col] = 0;           // empty the old spot
-                    board[emptySpot][col] = candy; // put the candy in its new spot
-
-                    emptySpot--;                   // the next candy lands one spot higher
+                    board[row][col] = board[row - 1][col];
+                    board[row - 1][col] = 0;
                 }
             }
         }
+    }
 }
-
 void refillBoard()
 {
-    // TODO: Fill empty cells with random candy values from 1 to 6.
+    for (int row = 0; row < ROWS; row++)
+    {
+        for (int col = 0; col < COLS; col++)
+        {
+            if (board[row][col] == 0)
+            {
+                // 1 to 6, new candy
+                int newCandy = rand() % 6 + 1;
+                board[row][col] = newCandy;
+            }
+        }
+    }
 }
 
 bool trySwap(int row1, int col1, int row2, int col2)
