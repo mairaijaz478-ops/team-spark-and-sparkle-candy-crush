@@ -115,19 +115,143 @@ bool loadLevel(const char* fileName)
 
 }
 
-
-
-
-
-void handleInput(sf::RenderWindow& window)
+void handleInput(sf::RenderWindow& window)//maira
 {
-    (void)window;
-    // TODO: Add menu, board selection, swapping, and Escape-key handling.
+    while (auto event = window.pollEvent())
+    {
+        // close button
+        if (event->is<sf::Event::Closed>())
+        {
+            window.close();
+        }
+
+        // key press
+        if (auto* key = event->getIf<sf::Event::KeyPressed>())
+        {
+            // Escape - back to menu or close
+            if (key->code == sf::Keyboard::Key::Escape)
+            {
+                if (gameState == 1)
+                {
+                    gameState = 0;
+                    selectedrow = -1;
+                    selectedcol = -1;
+                }
+                else
+                {
+                    window.close();
+                }
+            }
+
+            // Enter - start game from menu
+            if (key->code == sf::Keyboard::Key::Enter)
+            {
+                if (gameState == 0)
+                {
+                    gameState = 1;
+                    score = 0;
+                    movesLeft = 20;
+                    selectedrow = -1;
+                    selectedcol = -1;
+                }
+            }
+        }
+
+        // mouse click
+        if (auto* mouse = event->getIf<sf::Event::MouseButtonPressed>())
+        {
+            if (gameState != 1)
+            {
+                continue;
+            }
+
+            if (mouse->button == sf::Mouse::Button::Left)
+            {
+                int mouseX = mouse->position.x;
+                int mouseY = mouse->position.y;
+
+                // mouse to board r and c - using YOUR CELL, BOARD_X, BOARD_Y
+                int c = (mouseX - (int)BOARD_X) / (int)CELL;
+                int r = (mouseY - (int)BOARD_Y) / (int)CELL;
+
+                // if outside board, ignore
+                if (r < 0 || r >= ROWS || c < 0 || c >= COLS)
+                {
+                    continue;
+                }
+
+                // save click for updateGame
+                clickX = c;
+                clickY = r;
+                clicked = true;
+
+                // first click - select
+                if (selectedrow == -1)
+                {
+                    selectedrow = r;
+                    selectedcol = c;
+                }
+                // second click - clear selection, updateGame will do swap
+                else
+                {
+                    selectedrow = -1;
+                    selectedcol = -1;
+                }
+            }
+        }
+    }
 }
 
-void updateGame()
+void updateGame()//maira
 {
     // TODO: Add game-state changes, match processing, scoring, and win/lose checks.
+    if (gameState != 1)
+    {
+        return; // only work when playing
+    }
+
+    bool matches[ROWS][COLS];
+    findMatches(matches);
+
+    // check if any match is there
+    bool any = false;
+    for (int r = 0; r < ROWS; r++)
+    {
+        for (int c = 0; c < COLS; c++)
+        {
+            if (matches[r][c] == true)
+            {
+                any = true;
+            }
+        }
+    }
+
+    // if match found, clear and refill
+    if (any == true)
+    {
+        clearMatches(matches);
+        dropCandies();
+        refillBoard();
+    }
+
+    // win check
+    if (score >= 500)
+    {
+        gameState = 2; // win screen
+        return;
+    }
+
+    // lose check
+    if (movesLeft <= 0)
+    {
+        // if still match left, don't lose yet
+        if (any == true)
+        {
+            return;
+        }
+        gameState = 3; // lose screen
+        return;
+    }
 }
 
 void drawGame(sf::RenderWindow& window)
@@ -237,7 +361,7 @@ void refillBoard()
     }
 }
 
-bool trySwap(int row1, int col1, int row2, int col2)
+bool trySwap(int row1, int col1, int row2, int col2)//maira
 {
     (void)row1;
     (void)col1;
@@ -324,7 +448,7 @@ bool loadGame(const char* fileName)
     return false;
 }
 
-void startNewGame()
+void startNewGame()//maira
 {
     // TODO: Reset score and load level.txt.
 }
