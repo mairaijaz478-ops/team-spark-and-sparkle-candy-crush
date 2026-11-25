@@ -87,33 +87,35 @@ int main()
 // The declarations are provided to help divide the project into features.
 
 bool loadLevel(const char* fileName)
-{
-        std::ifstream file(fileName);
-        if (!file)
+{//umama
+    std::ifstream file(fileName);
+    if (!file)
+    {
+        return false;
+    }
+
+    file >> movesLeft;
+    file >> targetScore;
+    selectedrow = -1;
+    selectedcol = -1;
+    score = 0;
+
+    for (int r = 0; r < ROWS; r++)
+    {
+        for (int c = 0; c < COLS; c++)
         {
-            return false;
+            file >> board[r][c];
+            marked[r][c] = false;
         }
+    }
 
-        file >> movesLeft;
-        file >> targetScore;
-        selectedrow = -1;
-        selectedcol = -1;
-        score = 0;
+    file.close();
+    return true;
 
-        for (int r = 0; r < ROWS; r++)
-        {
-            for (int c = 0; c < COLS; c++)
-            {
-                file >> board[r][c];
-                marked[r][c] = false;
-            }
-        }
-
-        file.close();
-        return true;
-    
 
 }
+
+
 
 
 
@@ -245,16 +247,74 @@ bool trySwap(int row1, int col1, int row2, int col2)
     return false;
 }
 
-void processChains()
+void processChains()//umama 
+
 {
-    // TODO: Repeat clear, drop, refill, and match detection until no matches remain.
+    bool keepChecking = true;
+
+    while (keepChecking == true)
+    {
+        bool matches[ROWS][COLS];
+        findMatches(matches);
+
+        bool hasMatch = false;
+
+        // Check if any candy is part of a match
+        for (int row = 0; row < ROWS; row++)
+        {
+            for (int col = 0; col < COLS; col++)
+            {
+                if (matches[row][col] == true)
+                {
+                    hasMatch = true;
+                }
+            }
+        }
+
+        // Stop when there are no matches
+        if (hasMatch == false)
+        {
+            keepChecking = false;
+        }
+        else
+        {
+            clearMatches(matches);
+            dropCandies();
+            refillBoard();
+        }
+    }
 }
 
+
 bool saveGame(const char* fileName)
-{
-    (void)fileName;
-    // TODO: Save score, moves, target, and all 8 board rows.
-    return false;
+
+{//umAMA
+    ofstream saveFile;
+    saveFile.open(fileName);
+
+    if (saveFile.is_open() == false)
+    {
+        return false;
+    }
+
+    // Save the game information
+    saveFile << score << endl;
+    saveFile << movesLeft << endl;
+    saveFile << targetScore << endl;
+
+    // Save the candies on the board
+    for (int row = 0; row < ROWS; row++)
+    {
+        for (int col = 0; col < COLS; col++)
+        {
+            saveFile << board[row][col];
+        }
+
+        saveFile << endl;
+    }
+
+    saveFile.close();
+    return true;
 }
 
 bool loadGame(const char* fileName)
