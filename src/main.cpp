@@ -202,7 +202,7 @@ void handleInput(sf::RenderWindow& window)//maira
     }
 }
 
-void updateGame()//maira
+void updateGame()//maira 25-11
 {
     // TODO: Add game-state changes, match processing, scoring, and win/lose checks.
     if (gameState != 1)
@@ -324,7 +324,7 @@ void clearMatches(const bool matches[ROWS][COLS])
     }
 }
 
-void dropCandies()
+void dropCandies()//maira
 {
     // Check every column
     for (int col = 0; col < COLS; col++)
@@ -431,7 +431,7 @@ bool saveGame(const char* fileName)
     {
         for (int col = 0; col < COLS; col++)
         {
-            saveFile << board[row][col];
+            saveFile << board[row][col]<<" ";
         }
 
         saveFile << endl;
@@ -441,20 +441,98 @@ bool saveGame(const char* fileName)
     return true;
 }
 
-bool loadGame(const char* fileName)
+bool loadGame()//umama
 {
-    (void)fileName;
-    // TODO: Load a saved game and reset the selected cell.
-    return false;
+    ifstream loadFile("savegame.txt");
+
+    if (loadFile.is_open() == false)
+    {
+        return false;
+    }
+
+    // Read the saved information
+    score = -1;
+    movesLeft = -1;
+    targetScore = -1;
+
+    loadFile >> score;
+    loadFile >> movesLeft;
+    loadFile >> targetScore;
+
+    if (score < 0)
+    {
+        return false;
+    }
+
+    if (movesLeft < 0)
+    {
+        return false;
+    }
+
+    if (targetScore < 0)
+    {
+        return false;
+    }
+
+    // Read each candy and put it back on the board
+    for (int row = 0; row < ROWS; row++)
+    {
+        for (int col = 0; col < COLS; col++)
+        {
+            int candy = -1;
+            loadFile >> candy;
+
+            if (candy < 0)
+            {
+                return false;
+            }
+
+            if (candy > 6)
+            {
+                return false;
+            }
+
+            board[row][col] = candy;
+            marked[row][col] = false;
+        }
+    }
+
+    selectedrow = -1;
+    selectedcol = -1;
+    
+
+    loadFile.close();
+    return true;
 }
 
-void startNewGame()//maira
-{
-    // TODO: Reset score and load level.txt.
-}
+
+
+
+
+void startNewGame()//umama
+
+    {
+        score = 0;
+        movesLeft = 0;
+        targetScore = 0;
+        selectedrow = -1;
+        selectedcol = -1;
+        clickX = -1;
+        clickY = -1;
+
+        if (loadLevel("level.txt") == true)
+        {
+            gameState = 1; // start playing
+        }
+        else
+        {
+            gameState = 0; // stay on the menu if the file could not load
+        }
+    }
+
 
 void clearSaveFile(const char* fileName)
-{
+{//umama
     (void)fileName;
     // TODO: Empty the save file when the game ends.
 }
