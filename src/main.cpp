@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
-#include <fstream>   // <-- THIS LINE IS MISSING
+#include <fstream>   
 using namespace std;
 
 const int ROWS = 8;
@@ -360,15 +360,68 @@ void refillBoard()
         }
     }
 }
-
 bool trySwap(int row1, int col1, int row2, int col2)//maira
 {
-    (void)row1;
-    (void)col1;
-    (void)row2;
-    (void)col2;
-    // TODO: Swap neighboring candies only when the swap makes a match.
-    return false;
+    // 1. check if both are inside board
+    if (row1 < 0 || row1 >= ROWS || col1 < 0 || col1 >= COLS)
+    {
+        return false;
+    }
+    if (row2 < 0 || row2 >= ROWS || col2 < 0 || col2 >= COLS)
+    {
+        return false;
+    }
+
+    // 2. check if they are neighbours - only up/down/left/right
+    // same cell is not allowed, far cell is not allowed
+    int diffRow = row1 - row2;
+    if (diffRow < 0)
+    {
+        diffRow = -diffRow;
+    }
+    int diffCol = col1 - col2;
+    if (diffCol < 0)
+    {
+        diffCol = -diffCol;
+    }
+
+    if (diffRow + diffCol != 1)
+    {
+        return false; // not neighbours
+    }
+
+    // 3. swap them for now
+    int temp = board[row1][col1];
+    board[row1][col1] = board[row2][col2];
+    board[row2][col2] = temp;
+
+    // 4. check if this swap made a match
+    bool matches[ROWS][COLS];
+    findMatches(matches);
+
+    bool any = false;
+    for (int r = 0; r < ROWS; r++)
+    {
+        for (int c = 0; c < COLS; c++)
+        {
+            if (matches[r][c] == true)
+            {
+                any = true;
+            }
+        }
+    }
+
+    // 5. if no match, swap back - illegal move
+    if (any == false)
+    {
+        temp = board[row1][col1];
+        board[row1][col1] = board[row2][col2];
+        board[row2][col2] = temp;
+        return false;
+    }
+
+    // 6. match found, keep the swap
+    return true;
 }
 
 void processChains()//umama 
