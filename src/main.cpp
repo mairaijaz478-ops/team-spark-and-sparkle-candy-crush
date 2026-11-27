@@ -237,6 +237,7 @@ void updateGame()//maira 25-11
     // win check
     if (score >= 500)
     {
+		clearSaveFile("savegame.txt");//clear save file on win
         gameState = 2; // win screen
         return;
     }
@@ -249,19 +250,153 @@ void updateGame()//maira 25-11
         {
             return;
         }
+		clearSaveFile("savegame.txt");//clear save file on lose
         gameState = 3; // lose screen
         return;
     }
 }
 
-void drawGame(sf::RenderWindow& window)
+void drawGame(sf::RenderWindow& window)//umama
 {
-    window.clear(sf::Color(25, 25, 45));
-    // TODO: Draw the HUD, menu, board, candies, selection, and end screen.
-    window.display();
+    void drawGame(sf::RenderWindow & window)
+    {
+        window.clear(sf::Color(25, 25, 45));
+
+        // Load the font only once
+        static sf::Font font;
+        static bool fontLoaded = font.openFromFile("arial.ttf");
+
+        // Make one text object and change it when needed
+        if (fontLoaded == true)
+        {
+            sf::Text text(font, "", 24);
+
+            // Menu screen
+            if (gameState == 0)
+            {
+                text.setString("CANDY CRUSH");
+                text.setCharacterSize(40);
+                text.setPosition({ 170.f, 180.f });
+                window.draw(text);
+
+                text.setString("Press ENTER to start");
+                text.setCharacterSize(24);
+                text.setPosition({ 180.f, 300.f });
+                window.draw(text);
+            }
+
+            // Score information during the game
+            if (gameState == 1)
+            {
+                text.setString("Score: " + to_string(score));
+                text.setPosition({ 20.f, 20.f });
+                window.draw(text);
+
+                text.setString("Moves left: " + to_string(movesLeft));
+                text.setPosition({ 220.f, 20.f });
+                window.draw(text);
+
+                text.setString("Target: " + to_string(targetScore));
+                text.setPosition({ 420.f, 20.f });
+                window.draw(text);
+            }
+
+            // Win screen
+            if (gameState == 2)
+            {
+                text.setString("YOU WIN!");
+                text.setCharacterSize(44);
+                text.setPosition({ 210.f, 250.f });
+                window.draw(text);
+
+                text.setString("Final score: " + to_string(score));
+                text.setCharacterSize(26);
+                text.setPosition({ 190.f, 320.f });
+                window.draw(text);
+            }
+
+            // Game-over screen
+            if (gameState == 3)
+            {
+                text.setString("GAME OVER");
+                text.setCharacterSize(44);
+                text.setPosition({ 190.f, 250.f });
+                window.draw(text);
+
+                text.setString("Final score: " + to_string(score));
+                text.setCharacterSize(26);
+                text.setPosition({ 190.f, 320.f });
+                window.draw(text);
+            }
+        }
+
+        // Draw the board while playing
+        if (gameState == 1)
+        {
+            for (int row = 0; row < ROWS; row++)
+            {
+                for (int col = 0; col < COLS; col++)
+                {
+                    float x = BOARD_X + col * CELL;
+                    float y = BOARD_Y + row * CELL;
+
+                    // Draw the square for this cell
+                    sf::RectangleShape tile({ CELL - 2.f, CELL - 2.f });
+                    tile.setPosition({ x, y });
+                    tile.setFillColor(sf::Color(55, 55, 80));
+
+                    // Put a yellow border around the selected cell
+                    if (row == selectedrow && col == selectedcol)
+                    {
+                        tile.setOutlineColor(sf::Color::Yellow);
+                        tile.setOutlineThickness(3.f);
+                    }
+
+                    window.draw(tile);
+
+                    // Draw a candy if this cell contains one
+                    if (board[row][col] != 0)
+                    {
+                        sf::CircleShape candy(25.f);
+                        candy.setPosition({ x + 8.f, y + 8.f });
+
+                        if (board[row][col] == 1)
+                        {
+                            candy.setFillColor(sf::Color::Red);
+                        }
+                        else if (board[row][col] == 2)
+                        {
+                            candy.setFillColor(sf::Color::Blue);
+                        }
+                        else if (board[row][col] == 3)
+                        {
+                            candy.setFillColor(sf::Color::Green);
+                        }
+                        else if (board[row][col] == 4)
+                        {
+                            candy.setFillColor(sf::Color::Yellow);
+                        }
+                        else if (board[row][col] == 5)
+                        {
+                            candy.setFillColor(sf::Color::Magenta);
+                        }
+                        else if (board[row][col] == 6)
+                        {
+                            candy.setFillColor(sf::Color::Cyan);
+                        }
+
+                        window.draw(candy);
+                    }
+                }
+            }
+        }
+
+        // Show everything that was drawn
+        window.display();
+    }
 }
 
-void findMatches(bool matches[ROWS][COLS])
+void findMatches(bool matches[ROWS][COLS])//umama
 {
     // First make all false, no match in start
     for (int r = 0; r < ROWS; r++)
@@ -586,6 +721,16 @@ void startNewGame()//umama
 
 void clearSaveFile(const char* fileName)
 {//umama
-    (void)fileName;
-    // TODO: Empty the save file when the game ends.
+    bool clearSaveFile(const char* fileName)
+    {
+        ofstream saveFile(fileName);
+
+        if (saveFile.is_open() == false)
+        {
+            return false;
+        }
+
+        saveFile.close();
+        return true;
+    }
 }
