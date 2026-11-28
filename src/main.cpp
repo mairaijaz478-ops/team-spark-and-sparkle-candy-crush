@@ -3,7 +3,9 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
-#include <fstream>   
+#include <fstream>
+#include <string>
+
 using namespace std;
 
 const int ROWS = 8;
@@ -12,8 +14,12 @@ const float CELL = 70.f;
 const float BOARD_X = 20.f;
 const float BOARD_Y = 100.f;
 const int POINTS_PER_CANDY = 10;
+const int MENU = 0;
+const int PLAYING = 1;
+const int WIN = 2;
+const int GAME_OVER = 3;
+const int LOAD_ERROR = 4;
 
-// Game data. Add more variables if your team needs them.
 int board[ROWS][COLS] = {};
 bool marked[ROWS][COLS] = {};
 int score = 0;
@@ -21,12 +27,9 @@ int movesLeft = 0;
 int targetScore = 0;
 int selectedrow = -1;
 int selectedcol = -1;
-int gameState = 0;
-int clickX = -1;
-int clickY = -1;
-bool clicked = false;
+int gameState = MENU;
+string statusMessage;
 
-// Function declarations. The game logic is intentionally left for your team.
 bool loadLevel(const char* fileName);
 void handleInput(sf::RenderWindow& window);
 void updateGame();
@@ -44,37 +47,13 @@ void clearSaveFile(const char* fileName);
 
 int main()
 {
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+    srand(static_cast<unsigned int>(time(nullptr)));
 
     sf::RenderWindow window(sf::VideoMode({ 600, 680 }), "Candy Crush");
     window.setFramerateLimit(60);
 
     while (window.isOpen())
     {
-        clicked = false;
-
-        while (const std::optional event = window.pollEvent())
-        {
-            if (event->is<sf::Event::Closed>())
-            {
-                window.close();
-            }
-            else if (const auto* mouse = event->getIf<sf::Event::MouseButtonPressed>())
-            {
-                if (mouse->button == sf::Mouse::Button::Left)
-                {
-                    clickX = mouse->position.x;
-                    clickY = mouse->position.y;
-                    clicked = true;
-                }
-            }
-            else if (const auto* key = event->getIf<sf::Event::KeyPressed>())
-            {
-                // TODO: Store and handle the keys your game needs.
-                (void)key;
-            }
-        }
-
         handleInput(window);
         updateGame();
         drawGame(window);
@@ -83,360 +62,420 @@ int main()
     return 0;
 }
 
-// TODO: Implement the function bodies below with your partner.
-// The declarations are provided to help divide the project into features.
-
 bool loadLevel(const char* fileName)
-{//umama
-    std::ifstream file(fileName);
+{
+    // The level file contains rows, columns, moves, target, and then the board.
+    ifstream file(fileName);
     if (!file)
     {
+        statusMessage = "Could not open level.txt";
         return false;
     }
 
-    file >> movesLeft;
-    file >> targetScore;
+    int fileRows = 0;
+    int fileCols = 0;
+    if (!(file >> fileRows >> fileCols) || fileRows != ROWS || fileCols != COLS)
+    {
+        statusMessage = "level.txt must start with 8 8";
+        return false;
+    }
+
+    if (!(file >> movesLeft >> targetScore) || movesLeft < 0 || targetScore < 0)
+    {
+        statusMessage = "Moves or target score is invalid";
+        return false;
+    }
+
+    score = 0;
     selectedrow = -1;
     selectedcol = -1;
-    score = 0;
 
-    for (int r = 0; r < ROWS; r++)
+    for (int row = 0; row < ROWS; row++)
     {
-        for (int c = 0; c < COLS; c++)
+        for (int col = 0; col < COLS; col++)
         {
-            file >> board[r][c];
-            marked[r][c] = false;
+            if (!(file >> board[row][col]) || board[row][col] < 0 || board[row][col] > 6)
+            {
+                statusMessage = "Candy values must be from 0 to 6";
+                return false;
+            }
+            marked[row][col] = false;
         }
     }
 
-    file.close();
+    statusMessage.clear();
     return true;
-
-
 }
 
-void handleInput(sf::RenderWindow& window)//maira
+void handleInput(sf::RenderWindow& window)
 {
-    while (auto event = window.pollEvent())
+    while (const std::optional event = window.pollEvent())
     {
-        // close button
         if (event->is<sf::Event::Closed>())
         {
             window.close();
+            continue;
         }
 
-        // key press
-        if (auto* key = event->getIf<sf::Event::KeyPressed>())
+        if (const auto* key = event->getIf<sf::Event::KeyPressed>())
         {
-            // Escape - back to menu or close
-            if (key->code == sf::Keyboard::Key::Escape)
+            switch (gameState)
             {
-                if (gameState == 1)
+            case MENU:
+                if (key->code == sf::Keyboard::Key::N || key->code == sf::Keyboard::Key::Enter)
                 {
-                    gameState = 0;
-                    selectedrow = -1;
-                    selectedcol = -1;
+                    startNewGame();
                 }
-                else
+                else if (key->code == sf::Keyboard::Key::C)
+                {
+                    if (loadGame("savegame.txt"))
+                    {
+                        gameState = PLAYING;
+                        statusMessage.clear();
+                    }
+                    else
+                    {
+                        statusMessage = "No saved game";
+                    }
+                }
+                else if (key->code == sf::Keyboard::Key::Escape)
                 {
                     window.close();
                 }
-            }
+                break;
 
-            // Enter - start game from menu
-            if (key->code == sf::Keyboard::Key::Enter)
-            {
-                if (gameState == 0)
+            case PLAYING:
+                if (key->code == sf::Keyboard::Key::Escape)
                 {
-                    gameState = 1;
-                    score = 0;
-                    movesLeft = 20;
-                    selectedrow = -1;
-                    selectedcol = -1;
+                    if (saveGame("savegame.txt"))
+                    {
+                        gameState = MENU;
+                        selectedrow = -1;
+                        selectedcol = -1;
+                        statusMessage = "Game saved. Press C to continue.";
+                    }
+                    else
+                    {
+                        statusMessage = "Could not save savegame.txt";
+                    }
                 }
+                break;
+
+            case WIN:
+            case GAME_OVER:
+                if (key->code == sf::Keyboard::Key::Enter)
+                {
+                    gameState = MENU;
+                    statusMessage.clear();
+                }
+                break;
+
+            case LOAD_ERROR:
+                if (key->code == sf::Keyboard::Key::Enter)
+                {
+                    gameState = MENU;
+                }
+                else if (key->code == sf::Keyboard::Key::Escape)
+                {
+                    window.close();
+                }
+                break;
             }
         }
 
-        // mouse click
-        if (auto* mouse = event->getIf<sf::Event::MouseButtonPressed>())
+        const auto* mouse = event->getIf<sf::Event::MouseButtonPressed>();
+        if (mouse == nullptr || mouse->button != sf::Mouse::Button::Left)
         {
-            if (gameState != 1)
+            continue;
+        }
+
+        if (gameState == MENU)
+        {
+            int x = mouse->position.x;
+            int y = mouse->position.y;
+
+            // These three clickable rows are New Game, Continue, and Exit.
+            if (x >= 150 && x <= 450 && y >= 300 && y < 350)
             {
-                continue;
+                startNewGame();
             }
-
-            if (mouse->button == sf::Mouse::Button::Left)
+            else if (x >= 150 && x <= 450 && y >= 350 && y < 400)
             {
-                int mouseX = mouse->position.x;
-                int mouseY = mouse->position.y;
-
-                // mouse to board r and c - using YOUR CELL, BOARD_X, BOARD_Y
-                int c = (mouseX - (int)BOARD_X) / (int)CELL;
-                int r = (mouseY - (int)BOARD_Y) / (int)CELL;
-
-                // if outside board, ignore
-                if (r < 0 || r >= ROWS || c < 0 || c >= COLS)
+                if (loadGame("savegame.txt"))
                 {
-                    continue;
+                    gameState = PLAYING;
+                    statusMessage.clear();
                 }
-
-                // save click for updateGame
-                clickX = c;
-                clickY = r;
-                clicked = true;
-
-                // first click - select
-                if (selectedrow == -1)
-                {
-                    selectedrow = r;
-                    selectedcol = c;
-                }
-                // second click - clear selection, updateGame will do swap
                 else
                 {
-                    selectedrow = -1;
-                    selectedcol = -1;
+                    statusMessage = "No saved game";
                 }
             }
-        }
-    }
-}
-
-void updateGame()//maira 25-11
-{
-    // TODO: Add game-state changes, match processing, scoring, and win/lose checks.
-    if (gameState != 1)
-    {
-        return; // only work when playing
-    }
-
-    bool matches[ROWS][COLS];
-    findMatches(matches);
-
-    // check if any match is there
-    bool any = false;
-    for (int r = 0; r < ROWS; r++)
-    {
-        for (int c = 0; c < COLS; c++)
-        {
-            if (matches[r][c] == true)
+            else if (x >= 150 && x <= 450 && y >= 400 && y < 450)
             {
-                any = true;
+                window.close();
             }
-        }
-    }
-
-    // if match found, clear and refill
-    if (any == true)
-    {
-        clearMatches(matches);
-        dropCandies();
-        refillBoard();
-    }
-
-    // win check
-    if (score >= 500)
-    {
-		clearSaveFile("savegame.txt");//clear save file on win
-        gameState = 2; // win screen
-        return;
-    }
-
-    // lose check
-    if (movesLeft <= 0)
-    {
-        // if still match left, don't lose yet
-        if (any == true)
-        {
-            return;
-        }
-		clearSaveFile("savegame.txt");//clear save file on lose
-        gameState = 3; // lose screen
-        return;
-    }
-}
-
-void drawGame(sf::RenderWindow& window)//umama
-{
-    void drawGame(sf::RenderWindow & window)
-    {
-        window.clear(sf::Color(25, 25, 45));
-
-        // Load the font only once
-        static sf::Font font;
-        static bool fontLoaded = font.openFromFile("arial.ttf");
-
-        // Make one text object and change it when needed
-        if (fontLoaded == true)
-        {
-            sf::Text text(font, "", 24);
-
-            // Menu screen
-            if (gameState == 0)
-            {
-                text.setString("CANDY CRUSH");
-                text.setCharacterSize(40);
-                text.setPosition({ 170.f, 180.f });
-                window.draw(text);
-
-                text.setString("Press ENTER to start");
-                text.setCharacterSize(24);
-                text.setPosition({ 180.f, 300.f });
-                window.draw(text);
-            }
-
-            // Score information during the game
-            if (gameState == 1)
-            {
-                text.setString("Score: " + to_string(score));
-                text.setPosition({ 20.f, 20.f });
-                window.draw(text);
-
-                text.setString("Moves left: " + to_string(movesLeft));
-                text.setPosition({ 220.f, 20.f });
-                window.draw(text);
-
-                text.setString("Target: " + to_string(targetScore));
-                text.setPosition({ 420.f, 20.f });
-                window.draw(text);
-            }
-
-            // Win screen
-            if (gameState == 2)
-            {
-                text.setString("YOU WIN!");
-                text.setCharacterSize(44);
-                text.setPosition({ 210.f, 250.f });
-                window.draw(text);
-
-                text.setString("Final score: " + to_string(score));
-                text.setCharacterSize(26);
-                text.setPosition({ 190.f, 320.f });
-                window.draw(text);
-            }
-
-            // Game-over screen
-            if (gameState == 3)
-            {
-                text.setString("GAME OVER");
-                text.setCharacterSize(44);
-                text.setPosition({ 190.f, 250.f });
-                window.draw(text);
-
-                text.setString("Final score: " + to_string(score));
-                text.setCharacterSize(26);
-                text.setPosition({ 190.f, 320.f });
-                window.draw(text);
-            }
+            continue;
         }
 
-        // Draw the board while playing
-        if (gameState == 1)
+        if (gameState != PLAYING)
         {
-            for (int row = 0; row < ROWS; row++)
+            continue;
+        }
+
+        // Check pixel limits first because dividing a small negative number by CELL
+        // would round toward zero and could accidentally count as cell 0.
+        if (mouse->position.x < BOARD_X || mouse->position.x >= BOARD_X + COLS * CELL ||
+            mouse->position.y < BOARD_Y || mouse->position.y >= BOARD_Y + ROWS * CELL)
+        {
+            continue;
+        }
+
+        int col = (mouse->position.x - static_cast<int>(BOARD_X)) / static_cast<int>(CELL);
+        int row = (mouse->position.y - static_cast<int>(BOARD_Y)) / static_cast<int>(CELL);
+
+        // Ignore clicks outside the 8 by 8 board.
+        if (row < 0 || row >= ROWS || col < 0 || col >= COLS)
+        {
+            continue;
+        }
+
+        if (selectedrow == -1)
+        {
+            selectedrow = row;
+            selectedcol = col;
+        }
+        else if (selectedrow == row && selectedcol == col)
+        {
+            selectedrow = -1;
+            selectedcol = -1;
+        }
+        else
+        {
+            int rowDifference = selectedrow - row;
+            int colDifference = selectedcol - col;
+            if (rowDifference < 0) rowDifference = -rowDifference;
+            if (colDifference < 0) colDifference = -colDifference;
+
+            if (rowDifference + colDifference != 1)
             {
-                for (int col = 0; col < COLS; col++)
+                // A non-neighbour becomes the new selected candy.
+                selectedrow = row;
+                selectedcol = col;
+            }
+            else
+            {
+                bool madeMatch = trySwap(selectedrow, selectedcol, row, col);
+                movesLeft--;
+
+                if (madeMatch)
                 {
-                    float x = BOARD_X + col * CELL;
-                    float y = BOARD_Y + row * CELL;
+                    processChains();
+                }
 
-                    // Draw the square for this cell
-                    sf::RectangleShape tile({ CELL - 2.f, CELL - 2.f });
-                    tile.setPosition({ x, y });
-                    tile.setFillColor(sf::Color(55, 55, 80));
+                selectedrow = -1;
+                selectedcol = -1;
+            }
+        }
+    }
+}
 
-                    // Put a yellow border around the selected cell
+void updateGame()
+{
+    switch (gameState)
+    {
+    case PLAYING:
+        if (score >= targetScore)
+        {
+            clearSaveFile("savegame.txt");
+            gameState = WIN;
+        }
+        else if (movesLeft <= 0)
+        {
+            clearSaveFile("savegame.txt");
+            gameState = GAME_OVER;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+void drawGame(sf::RenderWindow& window)
+{
+    window.clear(sf::Color(25, 25, 45));
+
+    // This font path works on Windows; put arial.ttf beside the program if needed.
+    static sf::Font font;
+    static bool fontLoaded = font.openFromFile("C:/Windows/Fonts/arial.ttf");
+
+    switch (gameState)
+    {
+    case MENU:
+        if (fontLoaded)
+        {
+            sf::Text title(font, "CANDY CRUSH", 40);
+            title.setPosition({ 175.f, 205.f });
+            window.draw(title);
+
+            sf::Text option(font, "New Game (N/Enter)", 23);
+            option.setPosition({ 185.f, 300.f });
+            window.draw(option);
+            option.setString("Continue (C)");
+            option.setPosition({ 185.f, 350.f });
+            window.draw(option);
+            option.setString("Exit (Esc)");
+            option.setPosition({ 185.f, 400.f });
+            window.draw(option);
+
+            if (!statusMessage.empty())
+            {
+                sf::Text message(font, statusMessage, 18);
+                message.setPosition({ 150.f, 470.f });
+                message.setFillColor(sf::Color::Yellow);
+                window.draw(message);
+            }
+        }
+        break;
+
+    case LOAD_ERROR:
+        if (fontLoaded)
+        {
+            sf::Text error(font, "Could not load level", 30);
+            error.setPosition({ 155.f, 250.f });
+            window.draw(error);
+
+            sf::Text details(font, statusMessage + "\nPress ENTER to return", 18);
+            details.setPosition({ 95.f, 315.f });
+            window.draw(details);
+        }
+        break;
+
+    case WIN:
+    case GAME_OVER:
+        if (fontLoaded)
+        {
+            sf::Text result(font, gameState == WIN ? "YOU WIN!" : "GAME OVER", 40);
+            result.setPosition({ 190.f, 230.f });
+            window.draw(result);
+
+            sf::Text finalScore(font, "Final score: " + to_string(score) + "\nPress ENTER for menu", 22);
+            finalScore.setPosition({ 170.f, 305.f });
+            window.draw(finalScore);
+        }
+        break;
+
+    case PLAYING:
+    {
+        // The HUD shows score, moves left, and target score above the board.
+        sf::RectangleShape panel({ 560.f, 62.f });
+        panel.setPosition({ 20.f, 20.f });
+        panel.setFillColor(sf::Color(25, 25, 55));
+        panel.setOutlineColor(sf::Color(145, 155, 220));
+        panel.setOutlineThickness(3.f);
+        window.draw(panel);
+
+        if (fontLoaded)
+        {
+            sf::Text text(font, "", 16);
+            text.setString("SCORE: " + to_string(score));
+            text.setPosition({ 45.f, 38.f });
+            window.draw(text);
+
+            text.setString("MOVES: " + to_string(movesLeft));
+            text.setPosition({ 245.f, 38.f });
+            window.draw(text);
+
+            text.setString("TARGET: " + to_string(targetScore));
+            text.setPosition({ 425.f, 38.f });
+            window.draw(text);
+        }
+
+        sf::Color colors[7] = {
+            sf::Color(25, 25, 45), // 0: empty
+            sf::Color::Red,        // 1
+            sf::Color(255, 150, 0),// 2: orange
+            sf::Color::Yellow,     // 3
+            sf::Color::Green,      // 4
+            sf::Color::Blue,       // 5
+            sf::Color(170, 90, 255)// 6: purple
+        };
+
+        for (int row = 0; row < ROWS; row++)
+        {
+            for (int col = 0; col < COLS; col++)
+            {
+                float x = BOARD_X + col * CELL;
+                float y = BOARD_Y + row * CELL;
+
+                sf::RectangleShape tile({ CELL - 2.f, CELL - 2.f });
+                tile.setPosition({ x, y });
+                tile.setFillColor(sf::Color(50, 55, 85));
+                tile.setOutlineColor(sf::Color(130, 140, 195));
+                tile.setOutlineThickness(1.f);
+                window.draw(tile);
+
+                if (board[row][col] != 0)
+                {
+                    sf::CircleShape candy(28.f);
+                    candy.setPosition({ x + 7.f, y + 7.f });
+                    candy.setFillColor(colors[board[row][col]]);
+
                     if (row == selectedrow && col == selectedcol)
                     {
-                        tile.setOutlineColor(sf::Color::Yellow);
-                        tile.setOutlineThickness(3.f);
+                        candy.setOutlineColor(sf::Color::White);
+                        candy.setOutlineThickness(4.f);
                     }
-
-                    window.draw(tile);
-
-                    // Draw a candy if this cell contains one
-                    if (board[row][col] != 0)
-                    {
-                        sf::CircleShape candy(25.f);
-                        candy.setPosition({ x + 8.f, y + 8.f });
-
-                        if (board[row][col] == 1)
-                        {
-                            candy.setFillColor(sf::Color::Red);
-                        }
-                        else if (board[row][col] == 2)
-                        {
-                            candy.setFillColor(sf::Color::Blue);
-                        }
-                        else if (board[row][col] == 3)
-                        {
-                            candy.setFillColor(sf::Color::Green);
-                        }
-                        else if (board[row][col] == 4)
-                        {
-                            candy.setFillColor(sf::Color::Yellow);
-                        }
-                        else if (board[row][col] == 5)
-                        {
-                            candy.setFillColor(sf::Color::Magenta);
-                        }
-                        else if (board[row][col] == 6)
-                        {
-                            candy.setFillColor(sf::Color::Cyan);
-                        }
-
-                        window.draw(candy);
-                    }
+                    window.draw(candy);
                 }
             }
         }
-
-        // Show everything that was drawn
-        window.display();
+        break;
     }
+    }
+
+    window.display();
 }
 
-void findMatches(bool matches[ROWS][COLS])//umama
+void findMatches(bool matches[ROWS][COLS])
 {
-    // First make all false, no match in start
-    for (int r = 0; r < ROWS; r++)
+    // Start by saying no cell is part of a match.
+    for (int row = 0; row < ROWS; row++)
     {
-        for (int c = 0; c < COLS; c++)
+        for (int col = 0; col < COLS; col++)
         {
-            matches[r][c] = false;
+            matches[row][col] = false;
         }
     }
 
-    // Check side by side - 3 same in a row
-    for (int r = 0; r < ROWS; r++)
+    // Check every group of three side-by-side candies.
+    for (int row = 0; row < ROWS; row++)
     {
-        for (int c = 0; c <= COLS - 3; c++)
+        for (int col = 0; col <= COLS - 3; col++)
         {
-            // If not empty and all 3 are same
-            if (board[r][c] != 0 &&
-                board[r][c] == board[r][c + 1] &&
-                board[r][c] == board[r][c + 2])
+            if (board[row][col] != 0 &&
+                board[row][col] == board[row][col + 1] &&
+                board[row][col] == board[row][col + 2])
             {
-                matches[r][c] = true;
-                matches[r][c + 1] = true;
-                matches[r][c + 2] = true;
+                matches[row][col] = true;
+                matches[row][col + 1] = true;
+                matches[row][col + 2] = true;
             }
         }
     }
 
-    // Check up to down - 3 same in a column
-    for (int c = 0; c < COLS; c++)
+    // Check every group of three candies going down a column.
+    for (int col = 0; col < COLS; col++)
     {
-        for (int r = 0; r <= ROWS - 3; r++)
+        for (int row = 0; row <= ROWS - 3; row++)
         {
-            // If not empty and all 3 are same
-            if (board[r][c] != 0 &&
-                board[r][c] == board[r + 1][c] &&
-                board[r][c] == board[r + 2][c])
+            if (board[row][col] != 0 &&
+                board[row][col] == board[row + 1][col] &&
+                board[row][col] == board[row + 2][col])
             {
-                matches[r][c] = true;
-                matches[r + 1][c] = true;
-                matches[r + 2][c] = true;
+                matches[row][col] = true;
+                matches[row + 1][col] = true;
+                matches[row + 2][col] = true;
             }
         }
     }
@@ -444,33 +483,28 @@ void findMatches(bool matches[ROWS][COLS])//umama
 
 void clearMatches(const bool matches[ROWS][COLS])
 {
-    // Go through whole board
-    for (int r = 0; r < ROWS; r++)
+    for (int row = 0; row < ROWS; row++)
     {
-        for (int c = 0; c < COLS; c++)
+        for (int col = 0; col < COLS; col++)
         {
-            // If this cell was matched
-            if (matches[r][c] == true)
+            if (matches[row][col] == true)
             {
-                board[r][c] = 0; // make it empty
-                score = score + 10; // 10 points for 1 candy
+                board[row][col] = 0;
+                score = score + POINTS_PER_CANDY;
             }
         }
     }
 }
 
-void dropCandies()//maira
+void dropCandies()
 {
-    // Check every column
+    // Repeat the bottom-up pass so candies move through several empty cells.
     for (int col = 0; col < COLS; col++)
     {
-        // We do this many times so candies fall all the way down
         for (int times = 0; times < ROWS; times++)
         {
-            // Check from bottom to top
             for (int row = ROWS - 1; row > 0; row--)
             {
-                // If this cell is empty, pull the candy from above down
                 if (board[row][col] == 0)
                 {
                     board[row][col] = board[row - 1][col];
@@ -480,6 +514,7 @@ void dropCandies()//maira
         }
     }
 }
+
 void refillBoard()
 {
     for (int row = 0; row < ROWS; row++)
@@ -488,79 +523,64 @@ void refillBoard()
         {
             if (board[row][col] == 0)
             {
-                // 1 to 6, new candy
                 int newCandy = rand() % 6 + 1;
                 board[row][col] = newCandy;
             }
         }
     }
 }
-bool trySwap(int row1, int col1, int row2, int col2)//maira
+
+bool trySwap(int r1, int c1, int r2, int c2)
 {
-    // 1. check if both are inside board
-    if (row1 < 0 || row1 >= ROWS || col1 < 0 || col1 >= COLS)
+    bool neighbour = false;
+
+    if (r1 == r2 && (c1 - c2 == 1 || c2 - c1 == 1))
+    {
+        neighbour = true;
+    }
+
+    if (c1 == c2 && (r1 - r2 == 1 || r2 - r1 == 1))
+    {
+        neighbour = true;
+    }
+
+    if (neighbour == false)
     {
         return false;
     }
-    if (row2 < 0 || row2 >= ROWS || col2 < 0 || col2 >= COLS)
-    {
-        return false;
-    }
 
-    // 2. check if they are neighbours - only up/down/left/right
-    // same cell is not allowed, far cell is not allowed
-    int diffRow = row1 - row2;
-    if (diffRow < 0)
-    {
-        diffRow = -diffRow;
-    }
-    int diffCol = col1 - col2;
-    if (diffCol < 0)
-    {
-        diffCol = -diffCol;
-    }
+    int temp = board[r1][c1];
+    board[r1][c1] = board[r2][c2];
+    board[r2][c2] = temp;
 
-    if (diffRow + diffCol != 1)
-    {
-        return false; // not neighbours
-    }
-
-    // 3. swap them for now
-    int temp = board[row1][col1];
-    board[row1][col1] = board[row2][col2];
-    board[row2][col2] = temp;
-
-    // 4. check if this swap made a match
     bool matches[ROWS][COLS];
     findMatches(matches);
 
-    bool any = false;
-    for (int r = 0; r < ROWS; r++)
+    bool anyMatch = false;
+    for (int row = 0; row < ROWS; row++)
     {
-        for (int c = 0; c < COLS; c++)
+        for (int col = 0; col < COLS; col++)
         {
-            if (matches[r][c] == true)
+            if (matches[row][col] == true)
             {
-                any = true;
+                anyMatch = true;
             }
         }
     }
 
-    // 5. if no match, swap back - illegal move
-    if (any == false)
+    if (anyMatch == false)
     {
-        temp = board[row1][col1];
-        board[row1][col1] = board[row2][col2];
-        board[row2][col2] = temp;
+        // No match was made, so put the candies back.
+        temp = board[r1][c1];
+        board[r1][c1] = board[r2][c2];
+        board[r2][c2] = temp;
         return false;
     }
 
-    // 6. match found, keep the swap
     return true;
 }
 
-void processChains()//umama 
-
+void processChains()
 {
     bool keepChecking = true;
 
@@ -568,10 +588,8 @@ void processChains()//umama
     {
         bool matches[ROWS][COLS];
         findMatches(matches);
-
         bool hasMatch = false;
 
-        // Check if any candy is part of a match
         for (int row = 0; row < ROWS; row++)
         {
             for (int col = 0; col < COLS; col++)
@@ -583,7 +601,6 @@ void processChains()//umama
             }
         }
 
-        // Stop when there are no matches
         if (hasMatch == false)
         {
             keepChecking = false;
@@ -597,140 +614,78 @@ void processChains()//umama
     }
 }
 
-
 bool saveGame(const char* fileName)
-
-{//umAMA
-    ofstream saveFile;
-    saveFile.open(fileName);
-
-    if (saveFile.is_open() == false)
+{
+    ofstream saveFile(fileName);
+    if (!saveFile)
     {
         return false;
     }
 
-    // Save the game information
-    saveFile << score << endl;
-    saveFile << movesLeft << endl;
-    saveFile << targetScore << endl;
-
-    // Save the candies on the board
+    // The first line stores score, moves left, and target score.
+    saveFile << score << ' ' << movesLeft << ' ' << targetScore << endl;
     for (int row = 0; row < ROWS; row++)
     {
         for (int col = 0; col < COLS; col++)
         {
-            saveFile << board[row][col]<<" ";
+            saveFile << board[row][col] << ' ';
         }
-
         saveFile << endl;
     }
 
-    saveFile.close();
     return true;
 }
 
-bool loadGame()//umama
+bool loadGame(const char* fileName)
 {
-    ifstream loadFile("savegame.txt");
-
-    if (loadFile.is_open() == false)
+    ifstream saveFile(fileName);
+    if (!saveFile)
     {
         return false;
     }
 
-    // Read the saved information
-    score = -1;
-    movesLeft = -1;
-    targetScore = -1;
-
-    loadFile >> score;
-    loadFile >> movesLeft;
-    loadFile >> targetScore;
-
-    if (score < 0)
+    if (!(saveFile >> score >> movesLeft >> targetScore) || score < 0 || movesLeft < 0 || targetScore < 0)
     {
         return false;
     }
 
-    if (movesLeft < 0)
-    {
-        return false;
-    }
-
-    if (targetScore < 0)
-    {
-        return false;
-    }
-
-    // Read each candy and put it back on the board
     for (int row = 0; row < ROWS; row++)
     {
         for (int col = 0; col < COLS; col++)
         {
-            int candy = -1;
-            loadFile >> candy;
-
-            if (candy < 0)
+            if (!(saveFile >> board[row][col]) || board[row][col] < 0 || board[row][col] > 6)
             {
                 return false;
             }
-
-            if (candy > 6)
-            {
-                return false;
-            }
-
-            board[row][col] = candy;
             marked[row][col] = false;
         }
     }
 
     selectedrow = -1;
     selectedcol = -1;
-    
-
-    loadFile.close();
     return true;
 }
 
+void startNewGame()
+{
+    score = 0;
+    movesLeft = 0;
+    targetScore = 0;
+    selectedrow = -1;
+    selectedcol = -1;
 
-
-
-
-void startNewGame()//umama
-
+    if (loadLevel("level.txt"))
     {
-        score = 0;
-        movesLeft = 0;
-        targetScore = 0;
-        selectedrow = -1;
-        selectedcol = -1;
-        clickX = -1;
-        clickY = -1;
-
-        if (loadLevel("level.txt") == true)
-        {
-            gameState = 1; // start playing
-        }
-        else
-        {
-            gameState = 0; // stay on the menu if the file could not load
-        }
+        gameState = PLAYING;
     }
-
+    else
+    {
+        gameState = LOAD_ERROR;
+    }
+}
 
 void clearSaveFile(const char* fileName)
-{//umama
-    bool clearSaveFile(const char* fileName)
-    {
-        ofstream saveFile(fileName);
-
-        if (saveFile.is_open() == false)
-        {
-            return false;
-        }
-
-        saveFile.close();
-        return true;
-    }
+{
+    // Opening with truncation empties a finished game's save file.
+    ofstream saveFile(fileName, ios::trunc);
 }
